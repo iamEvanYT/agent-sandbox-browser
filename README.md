@@ -70,7 +70,7 @@ To persist browser data (cookies, local storage, history, etc.) across container
 docker run -d \
   --shm-size=2gb \
   -p 9222:9222 \
-  -v chrome-data:/home/sandbox-browser/.chrome \
+  -v chrome-data:/home/openclaw-browser/.chrome \
   ghcr.io/iamevanyt/openclaw-sandbox-browser
 ```
 
@@ -84,7 +84,7 @@ services:
     ports:
       - "9222:9222"
     volumes:
-      - chrome-data:/home/sandbox-browser/.chrome
+      - chrome-data:/home/openclaw-browser/.chrome
 
 volumes:
   chrome-data:

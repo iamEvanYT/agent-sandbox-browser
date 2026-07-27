@@ -47,6 +47,8 @@ export async function startChrome(): Promise<Subprocess> {
     "--disable-crash-reporter",
     "--metrics-recording-only",
     "--no-sandbox",
+    "--disable-background-networking",
+    "--disable-component-update",
     "--enable-features=NetworkService,NetworkServiceInProcess",
     "--disable-blink-features=AutomationControlled",
     "about:blank",
