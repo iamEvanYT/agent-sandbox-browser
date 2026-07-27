@@ -5,6 +5,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Detect architecture and set variables
 ARG TARGETARCH
 
+# Pinned Chrome version (amd64 only; arm64 uses chromium from apt)
+ARG CHROME_VERSION=150.0.7871.186-1
+
 # Install dependencies
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -25,11 +28,12 @@ RUN apt-get update \
 
 # Install Chrome/Chromium based on architecture
 # Google Chrome only supports amd64, so use Chromium for arm64
+# amd64: pinned version downloaded directly for reproducible builds
 RUN if [ "$TARGETARCH" = "amd64" ]; then \
-      wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome-keyring.gpg \
-      && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+      wget -q "https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}_amd64.deb" \
       && apt-get update \
-      && apt-get install -y --no-install-recommends google-chrome-stable; \
+      && apt-get install -y --no-install-recommends ./google-chrome-stable_${CHROME_VERSION}_amd64.deb \
+      && rm google-chrome-stable_${CHROME_VERSION}_amd64.deb; \
     else \
       apt-get update \
       && apt-get install -y --no-install-recommends chromium; \
