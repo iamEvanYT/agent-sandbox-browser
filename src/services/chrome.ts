@@ -37,8 +37,8 @@ export async function startChrome(): Promise<Subprocess> {
 
   const args = [
     ...(config.headless ? ["--headless=new", "--disable-gpu"] : []),
-    "--remote-debugging-address=127.0.0.1",
-    "--remote-debugging-port=9223",
+    "--remote-debugging-address=0.0.0.0",
+    "--remote-debugging-port=9222",
     `--user-data-dir=${config.home}/.chrome`,
     "--no-first-run",
     "--no-default-browser-check",
@@ -71,11 +71,11 @@ export async function startChrome(): Promise<Subprocess> {
   for (let i = 0; i < 50; i++) {
     try {
       const res = await fetch(
-        "http://127.0.0.1:9223/json/version",
+        "http://127.0.0.1:9222/json/version",
         { signal: AbortSignal.timeout(1000) }
       );
       if (res.ok) {
-        log("Chrome is ready on port 9223");
+        log("Chrome is ready on port 9222");
         return proc;
       }
     } catch {}
