@@ -5,10 +5,12 @@ import { ensureDirectories } from "./cleanup";
 import { isRunning, killProcess } from "./process";
 import { startXvfb } from "./services/xvfb";
 import { startChrome } from "./services/chrome";
+import { startSocat } from "./services/socat";
 import { startX11Vnc, startWebsockify } from "./services/vnc";
 
 let xvfbProc: Subprocess | null = null;
 let chromeProc: Subprocess | null = null;
+let socatProc: Subprocess | null = null;
 let x11vncProc: Subprocess | null = null;
 let websockifyProc: Subprocess | null = null;
 
@@ -17,6 +19,7 @@ async function shutdown() {
 
   await Promise.all([
     killProcess(chromeProc, "Chrome"),
+    killProcess(socatProc, "socat"),
     killProcess(x11vncProc, "x11vnc"),
     killProcess(websockifyProc, "websockify"),
   ]);
@@ -45,6 +48,12 @@ async function monitor() {
       chromeProc = await startChrome();
     }
 
+    // Check socat
+    if (!isRunning(socatProc)) {
+      log("socat crashed, restarting...");
+      socatProc = startSocat();
+    }
+
     // Check VNC services
     if (config.enableNoVnc && !config.headless) {
       if (!isRunning(x11vncProc)) {
@@ -69,6 +78,9 @@ async function main() {
 
   xvfbProc = await startXvfb();
   chromeProc = await startChrome();
+
+  socatProc = startSocat();
+  log("CDP proxy listening on port 9222");
 
   if (config.enableNoVnc && !config.headless) {
     x11vncProc = startX11Vnc();
