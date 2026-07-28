@@ -68,6 +68,19 @@ docker run -d \
 | -------- | ------- | ----------- |
 | `HEADLESS` | `0` | Run headless (`1` to enable) |
 | `ENABLE_NOVNC` | `1` | Enable noVNC (`0` to disable) |
+| `ENABLE_HUMANIZE` | `1` | Humanize CDP mouse input (`0` for raw socat passthrough) |
+
+### Mouse humanization (`ENABLE_HUMANIZE`)
+
+When enabled (default), a CDP proxy sits on port 9222 in front of Chrome's internal CDP port 9223. It intercepts `Input.dispatchMouseEvent` and injects physiologically realistic cursor paths before clicks:
+
+- **Meyer submovements** — primary ballistic move (85–95% of distance) plus 1–3 corrective submovements
+- **Flash–Hogan minimum-jerk** — bell-shaped velocity profile peaking ~40% through each submovement
+- **Fitts' Law timing** — movement duration scales with distance (≈150ms for 50px, 500ms+ for 500px)
+- **Tremor** — 8–12Hz sinusoidal noise, amplitude ∝ velocity, fading near the target
+- **Overshoot** — ~12.5% of moves overshoot slightly then correct
+
+Set `ENABLE_HUMANIZE=0` to skip the proxy and use socat TCP passthrough instead (no mouse path injection).
 
 ### Headless vs Non-Headless
 
