@@ -18,7 +18,6 @@ RUN apt-get update \
     fonts-noto-color-emoji \
     gnupg \
     novnc \
-    socat \
     unzip \
     websockify \
     wget \
