@@ -4,47 +4,14 @@
  * MIT License
  *
  * Copyright (c) the humanize-cdp authors
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
  */
 
-import type { Server, ServerWebSocket } from "bun";
-
-// ─── Config ───────────────────────────────────────────────────────────────────
-
-const PORT = Number(process.env.PORT ?? 9333);
-const CDP_TARGET = process.env.CDP_TARGET ?? "http://localhost:9222";
-const CLICK_HOLD_MIN = Number(process.env.CLICK_HOLD_MIN ?? 50);
-const CLICK_HOLD_MAX = Number(process.env.CLICK_HOLD_MAX ?? 200);
-const JITTER_RANGE = Number(process.env.JITTER_RANGE ?? 2);
-
-const INJECTED_ID_START = 1_000_000;
-
-const targetBase = new URL(CDP_TARGET);
-const targetWsOrigin =
-  (targetBase.protocol === "https:" ? "wss:" : "ws:") +
-  "//" +
-  targetBase.host;
+import { config } from "./config";
+import type { CdpMessage, Point, Submove, WsData } from "./types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function rand(min: number, max: number): number {
+export function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
@@ -52,46 +19,12 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
-function sleep(ms: number): Promise<void> {
+export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function plusMinus(max: number): number {
   return (Math.random() < 0.5 ? -1 : 1) * rand(0, max);
-}
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface CdpMessage {
-  id?: number;
-  method?: string;
-  params?: Record<string, unknown>;
-  sessionId?: string;
-  result?: unknown;
-  error?: unknown;
-}
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface WsData {
-  path: string;
-  target: WebSocket | null;
-  ready: boolean;
-  buffer: string[];
-  lastX: number;
-  lastY: number;
-  hasPosition: boolean;
-  buttons: number;
-  pressForwardedAt: number | null;
-  nextInjectedId: number;
-  pendingInjected: Set<number>;
-  mouseTail: Promise<void>;
-  viewportW: number;
-  viewportH: number;
-  hasViewport: boolean;
 }
 
 // ─── Motion model ─────────────────────────────────────────────────────────────
@@ -138,16 +71,6 @@ function fittsDuration(dist: number, targetW = TARGET_W): number {
   const id = Math.log2(Math.max((2 * dist) / targetW, 1.05));
   const mt = FITTS_A + FITTS_B * id + rand(-35, 45);
   return clamp(mt, 90, 1100);
-}
-
-interface Submove {
-  /** Path parameter s ∈ [0,1] along the Bézier at submovement start. */
-  s0: number;
-  /** Path parameter s ∈ [0,1] along the Bézier at submovement end. */
-  s1: number;
-  durationMs: number;
-  /** Peak tremor scale for this submovement (px). */
-  tremorAmp: number;
 }
 
 function planSubmovements(
@@ -273,9 +196,9 @@ function sampleSubmovement(
     let x = pt.x + Math.sin(phase) * amp;
     let y = pt.y + Math.cos(phase * 1.13 + 0.7) * amp * 0.85;
 
-    if (JITTER_RANGE > 0 && sigma < 0.95) {
-      x += rand(-JITTER_RANGE * 0.3, JITTER_RANGE * 0.3);
-      y += rand(-JITTER_RANGE * 0.3, JITTER_RANGE * 0.3);
+    if (config.jitterRange > 0 && sigma < 0.95) {
+      x += rand(-config.jitterRange * 0.3, config.jitterRange * 0.3);
+      y += rand(-config.jitterRange * 0.3, config.jitterRange * 0.3);
     }
 
     const atEnd = tMs >= sub.durationMs - 0.5;
@@ -309,7 +232,7 @@ function sampleSubmovement(
   return { points, delays, elapsed };
 }
 
-function generatePath(
+export function generatePath(
   from: Point,
   to: Point,
 ): { points: Point[]; delays: number[]; totalMs: number } {
@@ -391,92 +314,9 @@ function generatePath(
   return { points, delays, totalMs };
 }
 
-// ─── HTTP URL rewriting ───────────────────────────────────────────────────────
+// ─── CDP send / inject plumbing ───────────────────────────────────────────────
 
-function rewriteDebuggerUrls(data: unknown, proxyHost: string): unknown {
-  if (Array.isArray(data)) {
-    return data.map((item) => rewriteDebuggerUrls(item, proxyHost));
-  }
-  if (data !== null && typeof data === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-      if (key === "webSocketDebuggerUrl" && typeof value === "string") {
-        try {
-          const u = new URL(value);
-          const scheme = u.protocol === "wss:" ? "wss" : "ws";
-          out[key] = `${scheme}://${proxyHost}${u.pathname}${u.search}`;
-        } catch {
-          out[key] = value;
-        }
-      } else {
-        out[key] = rewriteDebuggerUrls(value, proxyHost);
-      }
-    }
-    return out;
-  }
-  return data;
-}
-
-async function proxyHttp(req: Request): Promise<Response> {
-  const url = new URL(req.url);
-  const targetUrl = `${targetBase.origin}${url.pathname}${url.search}`;
-
-  const headers = new Headers(req.headers);
-  headers.set("host", targetBase.host);
-  headers.delete("connection");
-
-  const init: RequestInit = {
-    method: req.method,
-    headers,
-    redirect: "manual",
-  };
-
-  if (req.method !== "GET" && req.method !== "HEAD" && req.body) {
-    init.body = req.body;
-  }
-
-  let upstream: Response;
-  try {
-    upstream = await fetch(targetUrl, init);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return new Response(`Bad gateway: ${message}`, { status: 502 });
-  }
-
-  const contentType = upstream.headers.get("content-type") ?? "";
-  const proxyHost = req.headers.get("host") ?? `localhost:${PORT}`;
-
-  if (
-    contentType.includes("json") ||
-    url.pathname.startsWith("/json")
-  ) {
-    const text = await upstream.text();
-    let body = text;
-    try {
-      const parsed: unknown = JSON.parse(text);
-      body = JSON.stringify(rewriteDebuggerUrls(parsed, proxyHost));
-    } catch {
-      // non-JSON body under /json — leave as-is
-    }
-
-    const outHeaders = new Headers();
-    outHeaders.set("content-type", contentType || "application/json");
-    return new Response(body, { status: upstream.status, headers: outHeaders });
-  }
-
-  return new Response(upstream.body, {
-    status: upstream.status,
-    headers: upstream.headers,
-  });
-}
-
-// ─── Per-connection mouse humanization ────────────────────────────────────────
-
-function enqueueMouse(data: WsData, task: () => Promise<void>): void {
-  data.mouseTail = data.mouseTail.then(task, task);
-}
-
-function sendToTarget(data: WsData, msg: CdpMessage): void {
+export function sendToTarget(data: WsData, msg: CdpMessage): void {
   if (!data.target || data.target.readyState !== WebSocket.OPEN) return;
   data.target.send(JSON.stringify(msg));
 }
@@ -488,7 +328,7 @@ function injectId(data: WsData): number {
 }
 
 /** Resolvers for injected CDP calls that need a result (e.g. getLayoutMetrics) */
-const injectedWaiters = new Map<
+export const injectedWaiters = new Map<
   number,
   (result: Record<string, unknown> | null) => void
 >();
@@ -568,7 +408,7 @@ async function startPosition(
   };
 }
 
-async function injectMoves(
+export async function injectMoves(
   data: WsData,
   points: Point[],
   delays: number[],
@@ -594,7 +434,11 @@ async function injectMoves(
   }
 }
 
-async function handleMouseEvent(
+export function enqueueMouse(data: WsData, task: () => Promise<void>): void {
+  data.mouseTail = data.mouseTail.then(task, task);
+}
+
+export async function handleMouseEvent(
   data: WsData,
   msg: CdpMessage,
 ): Promise<void> {
@@ -636,7 +480,7 @@ async function handleMouseEvent(
 
   if (type === "mouseReleased") {
     if (data.pressForwardedAt !== null) {
-      const hold = rand(CLICK_HOLD_MIN, CLICK_HOLD_MAX);
+      const hold = rand(config.clickHoldMin, config.clickHoldMax);
       const elapsed = Date.now() - data.pressForwardedAt;
       const remaining = hold - elapsed;
       if (remaining > 0) await sleep(remaining);
@@ -662,187 +506,3 @@ async function handleMouseEvent(
     data.buttons = buttons;
   }
 }
-
-function handleClientMessage(ws: ServerWebSocket<WsData>, raw: string): void {
-  const data = ws.data;
-
-  if (!data.ready) {
-    data.buffer.push(raw);
-    return;
-  }
-
-  let msg: CdpMessage;
-  try {
-    msg = JSON.parse(raw) as CdpMessage;
-  } catch {
-    data.target?.send(raw);
-    return;
-  }
-
-  if (msg.method === "Input.dispatchMouseEvent") {
-    enqueueMouse(data, () => handleMouseEvent(data, msg));
-    return;
-  }
-
-  sendToTarget(data, msg);
-}
-
-function handleTargetMessage(ws: ServerWebSocket<WsData>, raw: string): void {
-  const data = ws.data;
-
-  let msg: CdpMessage;
-  try {
-    msg = JSON.parse(raw) as CdpMessage;
-  } catch {
-    if (ws.readyState === WebSocket.OPEN) ws.send(raw);
-    return;
-  }
-
-  if (typeof msg.id === "number" && data.pendingInjected.has(msg.id)) {
-    data.pendingInjected.delete(msg.id);
-    const waiter = injectedWaiters.get(msg.id);
-    if (waiter) {
-      injectedWaiters.delete(msg.id);
-      waiter(
-        msg.result && typeof msg.result === "object"
-          ? (msg.result as Record<string, unknown>)
-          : null,
-      );
-    }
-    // Eat injected response — do not forward to client
-    return;
-  }
-
-  if (ws.readyState === WebSocket.OPEN) ws.send(raw);
-}
-
-function connectTarget(ws: ServerWebSocket<WsData>): void {
-  const data = ws.data;
-  const targetUrl = `${targetWsOrigin}${data.path}`;
-  const target = new WebSocket(targetUrl);
-  data.target = target;
-
-  target.addEventListener("open", () => {
-    data.ready = true;
-    for (const buffered of data.buffer) {
-      handleClientMessage(ws, buffered);
-    }
-    data.buffer = [];
-  });
-
-  target.addEventListener("message", (event) => {
-    const raw =
-      typeof event.data === "string"
-        ? event.data
-        : new TextDecoder().decode(event.data as ArrayBuffer);
-    handleTargetMessage(ws, raw);
-  });
-
-  target.addEventListener("close", (event) => {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.close(event.code, event.reason);
-    }
-  });
-
-  target.addEventListener("error", () => {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.close(1011, "target error");
-    }
-  });
-}
-
-// ─── Server ───────────────────────────────────────────────────────────────────
-
-const clients = new Set<ServerWebSocket<WsData>>();
-
-const server: Server<WsData> = Bun.serve({
-  port: PORT,
-  fetch(req, srv) {
-    if (req.headers.get("upgrade")?.toLowerCase() === "websocket") {
-      const url = new URL(req.url);
-      const ok = srv.upgrade(req, {
-        data: {
-          path: url.pathname + url.search,
-          target: null,
-          ready: false,
-          buffer: [],
-          lastX: 0,
-          lastY: 0,
-          hasPosition: false,
-          buttons: 0,
-          pressForwardedAt: null,
-          nextInjectedId: INJECTED_ID_START,
-          pendingInjected: new Set(),
-          mouseTail: Promise.resolve(),
-          viewportW: 1280,
-          viewportH: 720,
-          hasViewport: false,
-        } satisfies WsData,
-      });
-      if (!ok) {
-        return new Response("WebSocket upgrade failed", { status: 400 });
-      }
-      return undefined;
-    }
-
-    return proxyHttp(req);
-  },
-  websocket: {
-    data: {} as WsData,
-
-    open(ws) {
-      clients.add(ws);
-      connectTarget(ws);
-    },
-
-    message(ws, message) {
-      const raw =
-        typeof message === "string"
-          ? message
-          : new TextDecoder().decode(message);
-      handleClientMessage(ws, raw);
-    },
-
-    close(ws) {
-      clients.delete(ws);
-      const target = ws.data.target;
-      if (target && target.readyState === WebSocket.OPEN) {
-        target.close();
-      }
-      ws.data.target = null;
-    },
-  },
-});
-
-console.error(
-  `humanize-cdp listening on :${server.port} → ${CDP_TARGET}`,
-);
-
-// ─── Clean exit ───────────────────────────────────────────────────────────────
-
-let shuttingDown = false;
-
-function shutdown(signal: string): void {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  console.error(`received ${signal}, closing connections…`);
-
-  for (const ws of clients) {
-    try {
-      ws.data.target?.close(1001, "proxy shutting down");
-    } catch {
-      /* ignore */
-    }
-    try {
-      ws.close(1001, "proxy shutting down");
-    } catch {
-      /* ignore */
-    }
-  }
-  clients.clear();
-  server.stop(true);
-  process.exit(0);
-}
-
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("SIGTERM", () => shutdown("SIGTERM"));

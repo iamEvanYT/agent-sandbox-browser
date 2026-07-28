@@ -2,7 +2,7 @@ import { spawn, type Subprocess } from "bun";
 
 export function startHumanize(): Subprocess {
   return spawn({
-    cmd: ["bun", "run", "src/proxy.ts"],
+    cmd: ["bun", "run", "src/proxy/index.ts"],
     stdout: "inherit",
     stderr: "inherit",
     env: {
