@@ -24,26 +24,9 @@ static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
 // ── libc FFI (no crates) ────────────────────────────────────────────────────
 
-#[repr(C)]
-struct Tm {
-    tm_sec: i32,
-    tm_min: i32,
-    tm_hour: i32,
-    tm_mday: i32,
-    tm_mon: i32,
-    tm_year: i32,
-    _tm_wday: i32,
-    _tm_yday: i32,
-    _tm_isdst: i32,
-    _tm_gmtoff: i64,
-    _tm_zone: *const i8,
-}
-
 unsafe extern "C" {
     fn kill(pid: i32, sig: i32) -> i32;
     fn signal(signum: i32, handler: Option<extern "C" fn(i32)>) -> Option<extern "C" fn(i32)>;
-    fn time(tloc: *mut i64) -> i64;
-    fn gmtime(timer: *const i64) -> *mut Tm;
 }
 
 const SIGINT: i32 = 2;
@@ -79,21 +62,30 @@ impl Config {
 // ── logging ─────────────────────────────────────────────────────────────────
 
 fn log(message: &str) {
-    let mut t: i64 = 0;
-    unsafe {
-        time(&mut t);
-        let tm = &*gmtime(&t);
-        println!(
-            "[{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z] {}",
-            tm.tm_year + 1900,
-            tm.tm_mon + 1,
-            tm.tm_mday,
-            tm.tm_hour,
-            tm.tm_min,
-            tm.tm_sec,
-            message
-        );
-    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = now.as_secs();
+    // Manual UTC decomposition — no crates, no unsafe
+    let days = secs / 86400;
+    let time_of_day = secs % 86400;
+    let hours = (time_of_day / 3600) % 24;
+    let minutes = (time_of_day / 60) % 60;
+    let seconds = time_of_day % 60;
+    // civil_from_days algorithm (Howard Hinnant)
+    let z = days + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = (yoe as i64) + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if month <= 2 { y + 1 } else { y };
+    println!(
+        "[{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z] {message}"
+    );
 }
 
 // ── cleanup / dirs ──────────────────────────────────────────────────────────
