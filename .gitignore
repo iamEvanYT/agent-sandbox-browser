@@ -13,5 +13,5 @@
 *.log
 logs/
 
-# Rust
-/target/
+# Bun
+node_modules/
