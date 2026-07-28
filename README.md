@@ -69,6 +69,19 @@ docker run -d \
 | `HEADLESS` | `0` | Run headless (`1` to enable) |
 | `ENABLE_NOVNC` | `1` | Enable noVNC (`0` to disable) |
 
+### Headless vs Non-Headless
+
+| | Non-Headless (`HEADLESS=0`) | Headless (`HEADLESS=1`) |
+| --- | --- | --- |
+| **Display** | Xvfb virtual framebuffer | None |
+| **CDP** | ✅ port 9222 | ✅ port 9222 |
+| **VNC** | ✅ port 5900 | ❌ disabled |
+| **noVNC** | ✅ port 6080 (if `ENABLE_NOVNC=1`) | ❌ disabled |
+| **Memory** | ~300MB+ (Xvfb + Chrome GPU) | ~150MB (Chrome only) |
+| **Use for** | Visual debugging, interactive sessions | Headless automation, agent use |
+
+**Note**: VNC and noVNC are silently disabled in headless mode regardless of `ENABLE_NOVNC`. |
+
 ## Persisting Browser Data
 
 Mount a volume to `/home/agent/.chrome` to persist cookies, local storage, history, and cache across restarts:
