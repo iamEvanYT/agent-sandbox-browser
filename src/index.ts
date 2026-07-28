@@ -69,7 +69,7 @@ async function monitor() {
 }
 
 async function main() {
-  log("Starting sandbox browser...");
+  log("Starting agent sandbox...");
 
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
@@ -80,12 +80,12 @@ async function main() {
   chromeProc = await startChrome();
 
   socatProc = startSocat();
-  log(`CDP proxy listening on port ${config.cdpPort}`);
+  log("CDP proxy listening on port 9222");
 
   if (config.enableNoVnc && !config.headless) {
     x11vncProc = startX11Vnc();
     websockifyProc = startWebsockify();
-    log(`noVNC available on port ${config.noVncPort}`);
+    log("noVNC available on port 6080");
   }
 
   await monitor();
