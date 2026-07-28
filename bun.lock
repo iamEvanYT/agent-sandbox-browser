@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "sandbox-browser",
+      "name": "agent-sandbox-browser",
       "devDependencies": {
         "@types/bun": "^1.2.2",
       },

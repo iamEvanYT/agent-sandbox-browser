@@ -1,5 +1,5 @@
 import { spawn, type Subprocess } from "bun";
-import { config, chromeCdpPort } from "../config";
+import { config } from "../config";
 import { cleanupChromeLocks } from "../cleanup";
 import { log } from "../log";
 
@@ -37,8 +37,8 @@ export async function startChrome(): Promise<Subprocess> {
 
   const args = [
     ...(config.headless ? ["--headless=new", "--disable-gpu"] : []),
-    "--remote-debugging-address=0.0.0.0",
-    `--remote-debugging-port=${chromeCdpPort}`,
+    "--remote-debugging-address=127.0.0.1",
+    "--remote-debugging-port=9223",
     `--user-data-dir=${config.home}/.chrome`,
     "--no-first-run",
     "--no-default-browser-check",
@@ -71,11 +71,11 @@ export async function startChrome(): Promise<Subprocess> {
   for (let i = 0; i < 50; i++) {
     try {
       const res = await fetch(
-        `http://127.0.0.1:${chromeCdpPort}/json/version`,
+        "http://127.0.0.1:9223/json/version",
         { signal: AbortSignal.timeout(1000) }
       );
       if (res.ok) {
-        log(`Chrome is ready on port ${chromeCdpPort}`);
+        log("Chrome is ready on port 9223");
         return proc;
       }
     } catch {}
