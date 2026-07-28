@@ -5,8 +5,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Detect architecture and set variables
 ARG TARGETARCH
 
-# Pinned Chrome version (amd64 only; arm64 uses chromium from apt)
+# Pinned Chrome version (amd64) and Chromium version (arm64)
 ARG CHROME_VERSION=150.0.7871.186-1
+ARG CHROMIUM_VERSION=150.0.7871.181-1~deb12u1
 
 # Install dependencies
 RUN apt-get update \
@@ -36,7 +37,8 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
       && rm google-chrome-stable_${CHROME_VERSION}_amd64.deb; \
     else \
       apt-get update \
-      && apt-get install -y --no-install-recommends chromium; \
+      && apt-get install -y --no-install-recommends chromium=${CHROMIUM_VERSION} \
+      && apt-mark hold chromium; \
     fi \
   && rm -rf /var/lib/apt/lists/*
 
