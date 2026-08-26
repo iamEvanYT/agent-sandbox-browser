@@ -18,12 +18,14 @@ RUN apt-get update \
     fonts-noto-color-emoji \
     gnupg \
     novnc \
-    socat \
     unzip \
     websockify \
     wget \
     x11-utils \
+    x11-xserver-utils \
     x11vnc \
+    xfonts-base \
+    xwit \
     xvfb \
   && rm -rf /var/lib/apt/lists/*
 
@@ -45,6 +47,11 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 # Install Bun
 RUN curl -fsSL https://bun.sh/install | bash \
   && mv /root/.bun/bin/bun /usr/local/bin/
+
+
+# Headed VNC cursor: tiny wrapper around the X pointer warp tool
+COPY scripts/warp-x-pointer /usr/local/bin/warp-x-pointer
+RUN chmod +x /usr/local/bin/warp-x-pointer
 
 WORKDIR /app
 

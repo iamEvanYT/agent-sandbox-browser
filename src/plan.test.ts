@@ -54,6 +54,11 @@ describe("planServices", () => {
     expect(deps({ headless: false, enableNoVnc: true }, "cdp-proxy")).toEqual(
       [],
     );
+    expect(
+      planServices({ headless: false, enableNoVnc: true }).find(
+        (s) => s.id === "cdp-proxy",
+      )?.displayName,
+    ).toBe("CDP proxy");
   });
 
   test("headed without noVNC omits the vnc stack", () => {
