@@ -1,31 +1,30 @@
 import { spawn, type Subprocess } from "bun";
-import { config } from "../config";
-import { cleanupXLocks } from "../cleanup";
+import type { Config } from "../config";
+import { cleanupXLocks } from "../runtime";
 import { log } from "../log";
 
-export async function startXvfb(): Promise<Subprocess> {
-  cleanupXLocks();
+export async function startXvfb(cfg: Config): Promise<Subprocess> {
+  cleanupXLocks(cfg.display);
 
   const proc = spawn({
     cmd: [
       "Xvfb",
-      config.display,
+      cfg.display,
       "-screen",
       "0",
-      "1280x800x24",
+      cfg.screen,
       "-ac",
       "-nolisten",
       "tcp",
     ],
     stdout: "inherit",
     stderr: "inherit",
-    env: { ...process.env, DISPLAY: config.display },
+    env: { ...process.env, DISPLAY: cfg.display },
   });
 
-  // Wait for X server to be ready
   for (let i = 0; i < 50; i++) {
     const check = spawn({
-      cmd: ["xdpyinfo", "-display", config.display],
+      cmd: ["xdpyinfo", "-display", cfg.display],
       stdout: "ignore",
       stderr: "ignore",
     });

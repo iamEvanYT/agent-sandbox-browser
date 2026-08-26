@@ -1,14 +1,14 @@
 import { spawn, type Subprocess } from "bun";
-import { config } from "../config";
+import type { Config } from "../config";
 
-export function startX11Vnc(): Subprocess {
+export function startX11Vnc(cfg: Config): Subprocess {
   return spawn({
     cmd: [
       "x11vnc",
       "-display",
-      config.display,
+      cfg.display,
       "-rfbport",
-      "5900",
+      String(cfg.vncPort),
       "-shared",
       "-forever",
       "-nopw",
@@ -16,18 +16,18 @@ export function startX11Vnc(): Subprocess {
     ],
     stdout: "inherit",
     stderr: "inherit",
-    env: { ...process.env, DISPLAY: config.display },
+    env: { ...process.env, DISPLAY: cfg.display },
   });
 }
 
-export function startWebsockify(): Subprocess {
+export function startNovnc(cfg: Config): Subprocess {
   return spawn({
     cmd: [
       "websockify",
       "--web",
       "/usr/share/novnc/",
-      "6080",
-      "localhost:5900",
+      String(cfg.noVncPort),
+      `localhost:${cfg.vncPort}`,
     ],
     stdout: "inherit",
     stderr: "inherit",
