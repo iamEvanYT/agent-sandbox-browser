@@ -1,0 +1,3 @@
+#!/bin/sh
+# Warp the X pointer to the given root coordinates so VNC shows a cursor.
+exec xwit -root -warp "$1" "$2"

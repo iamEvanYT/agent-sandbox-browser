@@ -26,7 +26,7 @@ export function isNovncEnabled(
  * Which processes run, in start order, with process-level dependencies.
  *
  * Headless: Chrome does not need X, so Xvfb/VNC stay out of the plan.
- * CDP proxy (socat) is process-independent of Chrome — it reconnects per
+ * CDP proxy is process-independent of Chrome — it reconnects per
  * connection — so a Chrome restart does not bounce the proxy.
  */
 export function planServices(
@@ -46,7 +46,7 @@ export function planServices(
 
   plan.push({
     id: "cdp-proxy",
-    displayName: "socat",
+    displayName: "CDP proxy",
     dependsOn: [],
   });
 
