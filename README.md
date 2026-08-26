@@ -9,11 +9,14 @@ restarts anything that dies *together with its dependents*.
 
 | Mode | Plan |
 | ---- | ---- |
-| Headed (`HEADLESS=0`) | Xvfb → Chrome → CDP proxy (socat `9222→9223`), plus x11vnc → noVNC if `ENABLE_NOVNC=1` |
+| Headed (`HEADLESS=0`) | Xvfb → Chrome → CDP proxy (`9222→9223`), plus x11vnc → noVNC if `ENABLE_NOVNC=1` |
 | Headless (`HEADLESS=1`) | Chrome (`--headless=new`) → CDP proxy. No Xvfb, no VNC. |
 
 Dependencies are explicit: Chrome and x11vnc depend on Xvfb; noVNC depends on x11vnc.
-The CDP proxy does not depend on the Chrome process (socat reconnects per connection).
+The CDP proxy does not depend on the Chrome process; it reconnects per connection.
+It humanizes mouse jumps with the rewards-farmer Bézier+Fitts path and types with
+mimic_typing delays, so clicks and keystrokes take real time. In headed mode it also
+warps the X pointer so VNC shows a cursor.
 
 ## Quick Start
 
