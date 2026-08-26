@@ -1,6 +1,6 @@
 # Agent Sandbox Browser
 
-Dockerized Chromium sandbox for AI agent automation. Chrome 150 with CDP, VNC, and noVNC.
+Dockerized Chromium sandbox for AI agent automation. Chrome 151 with CDP, VNC, and noVNC.
 
 ## Architecture
 

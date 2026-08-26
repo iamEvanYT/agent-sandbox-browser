@@ -56,6 +56,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            CHROME_VERSION=150.0.7871.186-1
+            CHROME_VERSION=151.0.7922.173-1
+            CHROMIUM_VERSION=151.0.7922.173-1~deb12u1
           cache-from: type=gha
           cache-to: type=gha,mode=max
