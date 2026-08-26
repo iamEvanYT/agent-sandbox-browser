@@ -2,6 +2,19 @@
 
 Dockerized Chromium sandbox for AI agent automation. Chrome 150 with CDP, VNC, and noVNC.
 
+## Architecture
+
+PID 1 is a process supervisor. It starts a **plan** of services from env, then
+restarts anything that dies *together with its dependents*.
+
+| Mode | Plan |
+| ---- | ---- |
+| Headed (`HEADLESS=0`) | Xvfb → Chrome → CDP proxy (socat `9222→9223`), plus x11vnc → noVNC if `ENABLE_NOVNC=1` |
+| Headless (`HEADLESS=1`) | Chrome (`--headless=new`) → CDP proxy. No Xvfb, no VNC. |
+
+Dependencies are explicit: Chrome and x11vnc depend on Xvfb; noVNC depends on x11vnc.
+The CDP proxy does not depend on the Chrome process (socat reconnects per connection).
+
 ## Quick Start
 
 ### Build
@@ -80,7 +93,7 @@ docker run -d \
 | **Memory** | ~300MB+ (Xvfb + Chrome GPU) | ~150MB (Chrome only) |
 | **Use for** | Visual debugging, interactive sessions | Headless automation, agent use |
 
-**Note**: VNC and noVNC are silently disabled in headless mode regardless of `ENABLE_NOVNC`. |
+**Note**: VNC and noVNC are silently disabled in headless mode regardless of `ENABLE_NOVNC`.
 
 ## Persisting Browser Data
 

@@ -1,6 +1,6 @@
 import { spawn, type Subprocess } from "bun";
-import { config } from "../config";
-import { cleanupChromeLocks } from "../cleanup";
+import type { Config } from "../config";
+import { cleanupChromeLocks } from "../runtime";
 import { log } from "../log";
 
 // Detect which browser binary to use
@@ -29,17 +29,17 @@ async function getBrowserBinary(): Promise<string> {
   throw new Error("No supported browser found (google-chrome or chromium)");
 }
 
-export async function startChrome(): Promise<Subprocess> {
-  cleanupChromeLocks();
+export async function startChrome(cfg: Config): Promise<Subprocess> {
+  cleanupChromeLocks(cfg.home);
 
   const browserBinary = await getBrowserBinary();
   log(`Using browser: ${browserBinary}`);
 
   const args = [
-    ...(config.headless ? ["--headless=new", "--disable-gpu"] : []),
+    ...(cfg.headless ? ["--headless=new", "--disable-gpu"] : []),
     "--remote-debugging-address=127.0.0.1",
-    "--remote-debugging-port=9223",
-    `--user-data-dir=${config.home}/.chrome`,
+    `--remote-debugging-port=${cfg.chromeCdpPort}`,
+    `--user-data-dir=${cfg.home}/.chrome`,
     "--no-first-run",
     "--no-default-browser-check",
     "--disable-features=TranslateUI",
@@ -60,10 +60,10 @@ export async function startChrome(): Promise<Subprocess> {
     stderr: "inherit",
     env: {
       ...process.env,
-      DISPLAY: config.display,
-      HOME: config.home,
-      XDG_CONFIG_HOME: `${config.home}/.config`,
-      XDG_CACHE_HOME: `${config.home}/.cache`,
+      ...(cfg.headless ? {} : { DISPLAY: cfg.display }),
+      HOME: cfg.home,
+      XDG_CONFIG_HOME: `${cfg.home}/.config`,
+      XDG_CACHE_HOME: `${cfg.home}/.cache`,
     },
   });
 
@@ -71,11 +71,11 @@ export async function startChrome(): Promise<Subprocess> {
   for (let i = 0; i < 50; i++) {
     try {
       const res = await fetch(
-        "http://127.0.0.1:9223/json/version",
+        `http://127.0.0.1:${cfg.chromeCdpPort}/json/version`,
         { signal: AbortSignal.timeout(1000) }
       );
       if (res.ok) {
-        log("Chrome is ready on port 9223");
+        log(`Chrome is ready on port ${cfg.chromeCdpPort}`);
         return proc;
       }
     } catch {}
