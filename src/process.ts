@@ -1,14 +1,19 @@
-import type { Subprocess } from "bun";
 import { log } from "./log";
 
-export function isRunning(proc: Subprocess | null): boolean {
+/** Minimal handle the supervisor needs. Bun's Subprocess satisfies this. */
+export interface ProcessHandle {
+  readonly exitCode: number | null;
+  kill(signal?: string | number): void;
+}
+
+export function isRunning(proc: ProcessHandle | null | undefined): boolean {
   if (!proc) return false;
   return proc.exitCode === null;
 }
 
 export async function killProcess(
-  proc: Subprocess | null,
-  name: string
+  proc: ProcessHandle | null | undefined,
+  name: string,
 ): Promise<void> {
   if (!proc || !isRunning(proc)) return;
 
