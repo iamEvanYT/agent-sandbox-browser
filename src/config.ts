@@ -5,7 +5,7 @@ export interface Config {
   readonly home: string;
   /** Chrome's loopback CDP port (not published). */
   readonly chromeCdpPort: number;
-  /** Public CDP port (socat proxy → chromeCdpPort). */
+  /** Public CDP port (humanizing proxy → chromeCdpPort). */
   readonly publicCdpPort: number;
   readonly vncPort: number;
   readonly noVncPort: number;
