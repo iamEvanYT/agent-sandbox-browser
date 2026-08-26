@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { startCdpProxyServer, type CdpMessage } from "./proxy";
+import { startCdpProxyServer, type CdpMessage, type ProxyOptions } from "./proxy";
 
 interface ChromeMsg extends CdpMessage {}
 
@@ -24,6 +24,7 @@ async function withProxy(
     replies: CdpMessage[];
     close: () => void;
   }) => Promise<void>,
+  extra: Partial<ProxyOptions> = {},
 ): Promise<void> {
   const chromeReceived: ChromeMsg[] = [];
   const chrome = Bun.serve({
@@ -76,7 +77,10 @@ async function withProxy(
     listenPort: 0,
     listenHost: "127.0.0.1",
     target: `http://127.0.0.1:${chrome.port}`,
-    sleep: async () => {},
+    sleep: extra.sleep ?? (async () => {}),
+    humanize: extra.humanize,
+    mouseSpeed: extra.mouseSpeed,
+    typeSpeed: extra.typeSpeed,
   });
 
   const replies: CdpMessage[] = [];
@@ -252,5 +256,54 @@ describe("keyboard humanization", () => {
       expect(keys[0]?.id).toBe(4);
       expect(keys[0]?.params?.key).toBe("Shift");
     });
+  });
+});
+
+describe("opt-in and speed", () => {
+  test("humanize false forwards a teleport click unchanged", async () => {
+    await withProxy(
+      async ({ chromeReceived, send, replies }) => {
+        send({
+          id: 9,
+          method: "Input.dispatchMouseEvent",
+          params: {
+            type: "mousePressed",
+            x: 500,
+            y: 400,
+            button: "left",
+            clickCount: 1,
+          },
+        });
+        await waitUntil(() => replies.some((r) => r.id === 9));
+        const mice = mouseEvents(chromeReceived);
+        expect(mice.length).toBe(1);
+        expect(mice[0]?.id).toBe(9);
+        expect(mice[0]?.params?.type).toBe("mousePressed");
+        expect(mice[0]?.params?.x).toBe(500);
+      },
+      { humanize: false },
+    );
+  });
+
+  test("mouseSpeed 2 halves sample delays", async () => {
+    const sleeps: number[] = [];
+    await withProxy(
+      async ({ send, replies }) => {
+        send({
+          id: 10,
+          method: "Input.dispatchMouseEvent",
+          params: { type: "mouseMoved", x: 500, y: 400 },
+        });
+        await waitUntil(() => replies.some((r) => r.id === 10));
+      },
+      {
+        mouseSpeed: 2,
+        sleep: async (ms) => {
+          sleeps.push(ms);
+        },
+      },
+    );
+    expect(sleeps.length).toBeGreaterThan(5);
+    expect(sleeps.every((ms) => ms === 5)).toBe(true);
   });
 });
