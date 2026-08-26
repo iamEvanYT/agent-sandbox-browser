@@ -13,6 +13,8 @@ export function startX11Vnc(cfg: Config): Subprocess {
       "-forever",
       "-nopw",
       "-localhost",
+      "-cursor",
+      "arrow",
     ],
     stdout: "inherit",
     stderr: "inherit",
