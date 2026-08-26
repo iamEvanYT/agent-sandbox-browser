@@ -5,9 +5,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Detect architecture and set variables
 ARG TARGETARCH
 
-# Pinned Chrome version (amd64) and Chromium version (arm64)
-ARG CHROME_VERSION=150.0.7871.186-1
-ARG CHROMIUM_VERSION=150.0.7871.181-1~deb12u1
+# Same upstream build: Chrome (amd64) and Debian Chromium (arm64)
+ARG CHROME_VERSION=151.0.7922.173-1
+ARG CHROMIUM_VERSION=151.0.7922.173-1~deb12u1
 
 # Install dependencies
 RUN apt-get update \
