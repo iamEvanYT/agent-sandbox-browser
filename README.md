@@ -14,9 +14,9 @@ restarts anything that dies *together with its dependents*.
 
 Dependencies are explicit: Chrome and x11vnc depend on Xvfb; noVNC depends on x11vnc.
 The CDP proxy does not depend on the Chrome process; it reconnects per connection.
-It humanizes mouse jumps with the rewards-farmer Bézier+Fitts path and types with
-mimic_typing delays, so clicks and keystrokes take real time. In headed mode it also
-warps the X pointer so VNC shows a cursor.
+Humanizing is opt-in. Set `ENABLE_HUMANIZE=1` and mouse jumps follow the
+rewards-farmer Bézier+Fitts path, typing gets mimic_typing delays, and headed
+mode warps the X pointer so VNC shows a cursor. Off, 9222 is a plain CDP proxy.
 
 ## Quick Start
 
@@ -44,6 +44,7 @@ services:
     environment:
       HEADLESS: "0"
       ENABLE_NOVNC: "1"
+      ENABLE_HUMANIZE: "1"
 
 volumes:
   chrome-data:
@@ -84,6 +85,10 @@ docker run -d \
 | -------- | ------- | ----------- |
 | `HEADLESS` | `0` | Run headless (`1` to enable) |
 | `ENABLE_NOVNC` | `1` | Enable noVNC (`0` to disable) |
+| `ENABLE_HUMANIZE` | `0` | Set to `1` to humanize mouse and typing on 9222 |
+| `HUMANIZE_SPEED` | `1` | Shared speed multiplier. `2` is twice as fast |
+| `HUMANIZE_MOUSE_SPEED` | `HUMANIZE_SPEED` | Mouse-only speed override |
+| `HUMANIZE_TYPE_SPEED` | `HUMANIZE_SPEED` | Typing-only speed override |
 
 ### Headless vs Non-Headless
 

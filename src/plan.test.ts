@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { loadConfig } from "./config";
+import { loadConfig, scaleDelayMs } from "./config";
 import { isNovncEnabled, planServices } from "./plan";
 
 function ids(cfg: { headless: boolean; enableNoVnc: boolean }) {
@@ -30,6 +30,31 @@ describe("loadConfig", () => {
   test("ENABLE_NOVNC=0 disables noVNC", () => {
     expect(loadConfig({ ENABLE_NOVNC: "0" }).enableNoVnc).toBe(false);
     expect(loadConfig({ ENABLE_NOVNC: "1" }).enableNoVnc).toBe(true);
+  });
+
+  test("ENABLE_HUMANIZE is off unless set to 1", () => {
+    expect(loadConfig({}).enableHumanize).toBe(false);
+    expect(loadConfig({ ENABLE_HUMANIZE: "0" }).enableHumanize).toBe(false);
+    expect(loadConfig({ ENABLE_HUMANIZE: "1" }).enableHumanize).toBe(true);
+  });
+
+  test("HUMANIZE_SPEED scales mouse and typing unless overridden", () => {
+    const cfg = loadConfig({ HUMANIZE_SPEED: "2" });
+    expect(cfg.humanizeMouseSpeed).toBe(2);
+    expect(cfg.humanizeTypeSpeed).toBe(2);
+    const split = loadConfig({
+      HUMANIZE_SPEED: "2",
+      HUMANIZE_MOUSE_SPEED: "4",
+      HUMANIZE_TYPE_SPEED: "0.5",
+    });
+    expect(split.humanizeMouseSpeed).toBe(4);
+    expect(split.humanizeTypeSpeed).toBe(0.5);
+  });
+
+  test("bad speed values fall back", () => {
+    expect(loadConfig({ HUMANIZE_SPEED: "0" }).humanizeMouseSpeed).toBe(1);
+    expect(loadConfig({ HUMANIZE_SPEED: "-3" }).humanizeMouseSpeed).toBe(1);
+    expect(loadConfig({ HUMANIZE_SPEED: "nope" }).humanizeMouseSpeed).toBe(1);
   });
 });
 
@@ -99,5 +124,12 @@ describe("planServices invariants", () => {
         }
       }
     }
+  });
+});
+
+describe("scaleDelayMs", () => {
+  test("speed 2 halves the delay", () => {
+    expect(scaleDelayMs(100, 2)).toBe(50);
+    expect(scaleDelayMs(10, 1)).toBe(10);
   });
 });
